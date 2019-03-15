@@ -15,6 +15,7 @@ char	*id = "$Id$\n";
 #include "bench.h"
 
 #define	CHK(x)	if ((x) == -1) { perror("x"); exit(1); }
+int fdProcDropCache = -1;
 
 typedef struct _state {
 	int fd;
@@ -87,6 +88,9 @@ main(int ac, char **av)
 
 	sprintf(buf, "Pagefaults on %s", state.file);
 	micro(buf, state.npages * get_n());
+
+	if(fdProcDropCache)
+		close(fdProcDropCache);
 #endif
 	return(0);
 }
@@ -157,6 +161,52 @@ cleanup(iter_t iterations, void* cookie)
 	free(state->pages);
 }
 
+void dropCache()
+{
+	if(0 < (fdProcDropCache = open("/proc/sys/vm/drop_caches", O_RDWR)))
+	{
+		syncfs(fdProcDropCache);
+		write(fdProcDropCache, "1", 1);
+	}
+	else
+		perror("open proc drop_chaches\n");
+}
+
+void
+checkPageout(void *cookie)
+{
+	state_t *state = (state_t *) cookie;
+
+	long length = state->size;
+	long numPages = state->npages;
+	unsigned char *vec = (unsigned char *) malloc(numPages);
+	unsigned int pageoutCount = 0;
+	static long j = 0;
+	if(NULL == vec)
+	{
+		printf("malloc failed\n");
+		return;
+	}
+
+	memset(vec, 0, numPages);
+
+	if(mincore(state->where, length, vec) == -1)
+		printf("Err: mincore() failed\n");
+	else
+	{
+		int i = 0;
+		for(i=0; i < state->npages; i++)
+		{
+		   if(0 == (vec[i] & 1))
+			pageoutCount++;
+		}
+	}
+
+        free(vec);
+	printf("[%d] %u of total %u pages was paged out (not in memory)\n",
+		++j, pageoutCount, state->npages);
+}
+
 void
 benchmark(iter_t iterations, void* cookie)
 {
@@ -165,6 +215,8 @@ benchmark(iter_t iterations, void* cookie)
 	state_t *state = (state_t *) cookie;
 
 	while (iterations-- > 0) {
+		dropCache();
+		//checkPageout(state);
 		for (i = 0; i < state->npages; ++i) {
 			sum += *(state->where + state->pages[i]);
 		}
@@ -188,6 +240,7 @@ benchmark_mmap(iter_t iterations, void* cookie)
 	state_t *state = (state_t *) cookie;
 
 	while (iterations-- > 0) {
+		dropCache();
 		munmap(state->where, state->size);
 		state->where = mmap(0, state->size, 
 				    PROT_READ, MAP_SHARED, state->fd, 0);
