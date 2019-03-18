@@ -15,7 +15,6 @@ char	*id = "$Id$\n";
 #include "bench.h"
 
 #define	CHK(x)	if ((x) == -1) { perror("x"); exit(1); }
-int fdProcDropCache = -1;
 
 typedef struct _state {
 	int fd;
@@ -25,6 +24,7 @@ typedef struct _state {
 	char* file;
 	char* where;
 	size_t* pages;
+	int fd_drop_cache;
 } state_t;
 
 void	initialize(iter_t iterations, void *cookie);
@@ -47,6 +47,7 @@ main(int ac, char **av)
 	char* usage = "[-C] [-P <parallel>] [-W <warmup>] [-N <repetitions>] file\n";
 
 	state.clone = 0;
+	state.fd_drop_cache = -1;
 
 	while (( c = getopt(ac, av, "P:W:N:C")) != EOF) {
 		switch(c) {
@@ -89,8 +90,8 @@ main(int ac, char **av)
 	sprintf(buf, "Pagefaults on %s", state.file);
 	micro(buf, state.npages * get_n());
 
-	if(fdProcDropCache)
-		close(fdProcDropCache);
+	if(state.fd_drop_cache > 0)
+		close(state.fd_drop_cache);
 #endif
 	return(0);
 }
@@ -146,6 +147,9 @@ initialize(iter_t iterations, void* cookie)
 		perror("msync");
 		exit(1);
 	}
+
+	CHK(state->fd_drop_cache = open("/proc/sys/vm/drop_caches", O_RDWR));
+	drop_cache(state->fd_drop_cache);
 #endif
 }
 
@@ -161,15 +165,14 @@ cleanup(iter_t iterations, void* cookie)
 	free(state->pages);
 }
 
-void dropCache()
+// write "1" to /proc/sys/vm/drop_caches
+void drop_cache(int fd)
 {
-	if(0 < (fdProcDropCache = open("/proc/sys/vm/drop_caches", O_RDWR)))
-	{
-		syncfs(fdProcDropCache);
-		write(fdProcDropCache, "1", 1);
-	}
-	else
-		perror("open proc drop_chaches\n");
+	if(fd < 0)
+		return;
+
+	sync();
+	write(fd, "1", 1);
 }
 
 void
@@ -215,7 +218,7 @@ benchmark(iter_t iterations, void* cookie)
 	state_t *state = (state_t *) cookie;
 
 	while (iterations-- > 0) {
-		dropCache();
+		drop_cache(state->fd_drop_cache);
 		//checkPageout(state);
 		for (i = 0; i < state->npages; ++i) {
 			sum += *(state->where + state->pages[i]);
@@ -240,7 +243,7 @@ benchmark_mmap(iter_t iterations, void* cookie)
 	state_t *state = (state_t *) cookie;
 
 	while (iterations-- > 0) {
-		dropCache();
+		drop_cache(state->fd_drop_cache);
 		munmap(state->where, state->size);
 		state->where = mmap(0, state->size, 
 				    PROT_READ, MAP_SHARED, state->fd, 0);
