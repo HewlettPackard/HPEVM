@@ -26,12 +26,17 @@ typedef struct _state {
 	size_t* pages;
 	int fd_drop_cache;
 	int drop_cache; // 0: don't drop, 1: drop
+	int page_permutation; // 0: serialize page, 1: randomize page
+	int verbose;
 } state_t;
 
 void	initialize(iter_t iterations, void *cookie);
 void	cleanup(iter_t iterations, void *cookie);
 void	benchmark(iter_t iterations, void * cookie);
 void	benchmark_mmap(iter_t iterations, void * cookie);
+size_t* serialize(void *cookie, size_t scale);
+void	check_pageout(void *cookie);
+void	drop_cache(int fd);
 
 int
 main(int ac, char **av)
@@ -45,13 +50,15 @@ main(int ac, char **av)
 	struct stat   st;
 	struct _state state;
 	char buf[2048];
-	char* usage = "[-C] [-D] [-P <parallel>] [-W <warmup>] [-N <repetitions>] file\n";
+	char* usage = "[-C] [-D] [-S] [-V] [-P <parallel>] [-W <warmup>] [-N <repetitions>] file\n";
 
 	state.clone = 0;
 	state.fd_drop_cache = -1;
 	state.drop_cache = 0;
+	state.page_permutation = 1;
+	state.verbose = 0;
 
-	while (( c = getopt(ac, av, "P:W:N:CD")) != EOF) {
+	while (( c = getopt(ac, av, "P:W:N:CDSV")) != EOF) {
 		switch(c) {
 		case 'P':
 			parallel = atoi(optarg);
@@ -68,6 +75,12 @@ main(int ac, char **av)
 			break;
 		case 'D':
 			state.drop_cache = 1;
+			break;
+		case 'S':
+			state.page_permutation = 0;
+			break;
+		case 'V':
+			state.verbose = 1;
 			break;
 		default:
 			lmbench_usage(ac, av, usage);
@@ -97,6 +110,8 @@ main(int ac, char **av)
 
 	if(state.fd_drop_cache > 0)
 		close(state.fd_drop_cache);
+	if(state.verbose)
+		printf("iteration=%llu, tBench:%f, tmmap:%f\n", get_n(), t_combined-t_mmap, t_mmap);
 #endif
 	return(0);
 }
@@ -114,6 +129,8 @@ initialize(iter_t iterations, void* cookie)
 	if(state->drop_cache && iterations)
 	{
 		drop_cache(state->fd_drop_cache);
+		if(state->verbose)
+			check_pageout(state);
 	}
 
 	if (iterations) return;
@@ -146,7 +163,10 @@ initialize(iter_t iterations, void* cookie)
 	state->size = sbuf.st_size;
 	state->size -= state->size % pagesize;
 	state->npages = state->size / pagesize;
-	state->pages = permutation(state->npages, pagesize);
+	if(state->page_permutation > 0)
+		state->pages = permutation(state->npages, pagesize);
+	else
+		state->pages = serialize(state, pagesize);
 
 	if (state->size < 1024*1024) {
 		fprintf(stderr, "lat_pagefault: %s too small\n", state->file);
@@ -188,16 +208,37 @@ void drop_cache(int fd)
 	write(fd, "1", 1);
 }
 
+size_t*
+serialize(void *cookie, size_t scale)
+{
+	state_t *state = (state_t *) cookie;
+	size_t max = state->npages;
+	size_t	i, v, o;
+	static size_t r = 0;
+	size_t*	result = (size_t*)malloc(max * sizeof(size_t));
+
+	if (result == NULL) return NULL;
+
+	if(state->verbose)
+		printf("serializing pages...\n");
+
+	for (i = 0; i < max; ++i) {
+		result[i] = i * scale;
+	}
+
+	return (result);
+}
+
 void
-checkPageout(void *cookie)
+check_pageout(void *cookie)
 {
 	state_t *state = (state_t *) cookie;
 
 	long length = state->size;
 	long numPages = state->npages;
-	unsigned char *vec = (unsigned char *) malloc(numPages);
 	unsigned int pageoutCount = 0;
 	static long j = 0;
+	unsigned char *vec = (unsigned char *) malloc(numPages);
 	if(NULL == vec)
 	{
 		printf("malloc failed\n");
@@ -218,8 +259,8 @@ checkPageout(void *cookie)
 		}
 	}
 
-        free(vec);
-	printf("[%d] %u of total %u pages was paged out (not in memory)\n",
+	free(vec);
+	printf("[%ld] %u of total %u pages was paged out (not in memory)\n",
 		++j, pageoutCount, state->npages);
 }
 
