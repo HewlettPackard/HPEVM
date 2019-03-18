@@ -25,6 +25,7 @@ typedef struct _state {
 	char* where;
 	size_t* pages;
 	int fd_drop_cache;
+	int drop_cache; // 0: don't drop, 1: drop
 } state_t;
 
 void	initialize(iter_t iterations, void *cookie);
@@ -44,12 +45,13 @@ main(int ac, char **av)
 	struct stat   st;
 	struct _state state;
 	char buf[2048];
-	char* usage = "[-C] [-P <parallel>] [-W <warmup>] [-N <repetitions>] file\n";
+	char* usage = "[-C] [-D] [-P <parallel>] [-W <warmup>] [-N <repetitions>] file\n";
 
 	state.clone = 0;
 	state.fd_drop_cache = -1;
+	state.drop_cache = 0;
 
-	while (( c = getopt(ac, av, "P:W:N:C")) != EOF) {
+	while (( c = getopt(ac, av, "P:W:N:CD")) != EOF) {
 		switch(c) {
 		case 'P':
 			parallel = atoi(optarg);
@@ -63,6 +65,9 @@ main(int ac, char **av)
 			break;
 		case 'C':
 			state.clone = 1;
+			break;
+		case 'D':
+			state.drop_cache = 1;
 			break;
 		default:
 			lmbench_usage(ac, av, usage);
@@ -102,6 +107,14 @@ initialize(iter_t iterations, void* cookie)
 	int 		pagesize;
 	struct stat 	sbuf;
 	state_t 	*state = (state_t *) cookie;
+
+	// it's an quick but ugly workaround (due to the framework of lib_timing.c)
+	// to drop cache before each benchmark() so that drop_caches overhead
+	// is not accumulated in final result.
+	if(state->drop_cache && iterations)
+	{
+		drop_cache(state->fd_drop_cache);
+	}
 
 	if (iterations) return;
 
@@ -218,8 +231,6 @@ benchmark(iter_t iterations, void* cookie)
 	state_t *state = (state_t *) cookie;
 
 	while (iterations-- > 0) {
-		drop_cache(state->fd_drop_cache);
-		//checkPageout(state);
 		for (i = 0; i < state->npages; ++i) {
 			sum += *(state->where + state->pages[i]);
 		}
@@ -243,7 +254,6 @@ benchmark_mmap(iter_t iterations, void* cookie)
 	state_t *state = (state_t *) cookie;
 
 	while (iterations-- > 0) {
-		drop_cache(state->fd_drop_cache);
 		munmap(state->where, state->size);
 		state->where = mmap(0, state->size, 
 				    PROT_READ, MAP_SHARED, state->fd, 0);
