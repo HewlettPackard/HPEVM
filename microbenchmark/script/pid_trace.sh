@@ -1,8 +1,8 @@
 #! /bin/bash
 
 FTRACE_ON=false
-LogFolderPath=/home/tdc/Documents/ftrace/5_autotest/log/$4
-FolderPath=/home/tdc/Documents/ftrace/5_autotest
+LogFolderPath=$MICROBENCHMARK_PATH/log/$4
+FolderPath=$MICROBENCHMARK_PATH
 round=$1
 target=$2
 
