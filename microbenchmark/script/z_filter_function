@@ -1,0 +1,5 @@
+__do_page_fault
+do_try_to_free_pages
+swap_writepage
+bdev_write_page
+

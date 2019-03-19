@@ -1,0 +1,9 @@
+[Unit]
+Description=Auto Paging Log Generator
+
+[Service]
+TimeoutStartSec=0
+ExecStart=/home/tdc/Documents/ftrace/5_autotest/script/multiRun.py
+
+[Install]
+WantedBy=multi-user.target

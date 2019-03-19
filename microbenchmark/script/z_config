@@ -1,0 +1,35 @@
+RootPath $MICROBENCHMARK_PATH/script/
+LogFolderPath $MICROBENCHMARK_PATH/log/
+OSSystemdPath /lib/systemd/system/autoGenPagingLog.service
+
+# Files need to in root path
+ScriptFile pid_trace.sh
+FilterFuncfile z_filter_function
+
+# Ftrace True or False
+FtraceOn True
+
+# Test Device
+#TestDev RDMA
+TestDev RAM
+
+# Test Method by list or diff
+TestMethod diff
+
+# Test Round
+Round 1
+
+# List method. List Arrey. Seperated by "," [MB] 
+TestList 262144,314573,367002,524288,786432,1048576
+
+# Diff method. [MB]
+InitSize 131072
+DiffSize 131072
+EndSize 1048576
+
+# Mail list. Seperated by ",". 
+# Make sure the server can use the mail command correctly
+MailList your@mail.com,who.need.to.know@mail.com 
+
+# Log Folders
+LogFolders ftd,ftrace,meminfo
