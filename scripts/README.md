@@ -16,13 +16,13 @@ swapDevManager.py server_ip name size create
 
 swapDevManager.py server_ip name delete
 
-##### Example - create a iSCSI ramdisk backstore of 10 MB on server 192.168.0.1 with 'test1' as the name
+##### Example - create a iSCSI ramdisk backstore of 10 GB on server 192.168.0.1 with 'test1' as the name
 
-./swapDevManager.py 192.168.0.100 test1 10 create
+./swapDevManager.py 192.168.0.1 test1 10 create
 
 ##### Example - delete the iSCSI ramdisk backstore named 'test1'
 
-./swapDevManager.py 192.168.0.100 test1 delete
+./swapDevManager.py 192.168.0.1 test1 delete
 
 ### On the memory user node:
 
