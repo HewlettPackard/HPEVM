@@ -1,0 +1,24 @@
+== Step 1. Clone & Build spdk ==
+
+NOTE: Need to remove (if) installed Mellanox OFED to avoid spdk dependent component conflicts
+
+# git clone https://github.com/spdk/spdk
+# cd spdk
+# git submodule update –init
+# sudo scripts/pkgdep.sh
+
+# ./configure --with-rdma
+# make
+
+# scripts/setup.sh
+Or
+# scripts/setup.sh reset
+
+== Step 2 Run spdk process ==
+Go into spdk folder, install prerequisites documented in 'spdk_setup.sh' and run it. The terminal will be occupied 
+by the spdk process if not run in the background.
+
+== Step 3 create SPDK NVMe target for client to connect ==
+On a separate terminal, go into spdk folder, run 'spdk_nvmf_target.sh'.
+Done, ready for client to connect.
+

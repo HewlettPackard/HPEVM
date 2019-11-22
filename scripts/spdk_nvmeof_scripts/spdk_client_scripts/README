@@ -1,0 +1,9 @@
+file 'testPagingW.sh'
+- Script for conducting paging_w test in client machine
+- Depends on several binaries (at least paging_w) that needs to be built up first
+- Need some manual edit for selecting testing local/remote device/protocol (some TODOs in it)
+
+
+file 'iscsi_client_login_server.sh'
+- Used by 'testPagingW.sh' for connect remote iSCSI device
+- Need manual setup ip:port and nqn name (currently hardcoded)
